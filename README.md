@@ -70,10 +70,12 @@ While editing:
 
 ## Icon
 
-`contents/icons/opencode-go-symbolic.svg` is the OpenCode mark, monochrome and
-recolored by the Plasma theme. `opencode-go.svg` is the colored variant. The mark
-is derived from the official OpenCode favicon/logo (opencode is open source,
-MIT). See <https://opencode.ai>.
+The tray uses `opencode-go.svg`: the OpenCode mark on its brand tile (dark
+rounded square, light glyph, same as the official favicon). The monochrome
+`opencode-go-symbolic.svg` is a theme-recolored fallback for placeholders. Both
+are copied into `~/.local/share/icons/hicolor/scalable/apps/` on install. The
+mark is derived from the official OpenCode favicon/logo (opencode is open
+source, MIT). See <https://opencode.ai>.
 
 ## License
 
