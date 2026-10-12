@@ -169,6 +169,9 @@ PlasmoidItem {
 
         Layout.minimumWidth: Kirigami.Units.gridUnit * 18
         Layout.preferredWidth: Kirigami.Units.gridUnit * 21
+        // The popup sizes itself from the content, so the explicit padding has
+        // to be added back here or the last row gets clipped.
+        Layout.minimumHeight: body.implicitHeight + topPadding + bottomPadding
         collapseMarginsHint: true
 
         // Guarantee an even inset on every edge instead of relying on the
@@ -179,6 +182,8 @@ PlasmoidItem {
         bottomPadding: Kirigami.Units.largeSpacing
 
         contentItem: ColumnLayout {
+            id: body
+
             spacing: Kirigami.Units.largeSpacing
 
             RowLayout {
