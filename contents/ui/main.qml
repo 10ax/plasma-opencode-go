@@ -18,6 +18,8 @@ PlasmoidItem {
 
     readonly property string consoleUrl: "https://opencode.ai/console"
 
+    readonly property int pollIntervalMs: 60000
+
     // Populated from the helper JSON.
     property var meters: []
     property string renewsAt: ""
@@ -26,8 +28,10 @@ PlasmoidItem {
     property string errorText: ""
     property bool loading: false
 
-    // Ticked every poll so the "Resets in" countdown stays fresh.
+    // Ticked every second so the "Resets in" and "Refreshing in" countdowns
+    // stay live between polls.
     property double nowMs: Date.now()
+    property double nextPollMs: 0
 
     function shellQuote(value) {
         return "'" + String(value).replace(/'/g, "'\\''") + "'";
@@ -36,9 +40,15 @@ PlasmoidItem {
     function refresh() {
         root.loading = true;
         root.nowMs = Date.now();
+        root.nextPollMs = root.nowMs + root.pollIntervalMs;
         // The trailing comment is a cheap cache-buster: the executable engine
         // treats every distinct source string as a new request.
         executableEngine.connectSource(shellQuote(helperPath) + " json # " + Date.now());
+    }
+
+    function refreshCountdownText() {
+        const seconds = Math.max(0, Math.ceil((root.nextPollMs - root.nowMs) / 1000));
+        return i18n("Refreshing in %1s", seconds);
     }
 
     function errorMessageFor(code) {
@@ -157,8 +167,7 @@ PlasmoidItem {
     fullRepresentation: PlasmaExtras.Representation {
         id: popup
 
-        Layout.minimumWidth: Kirigami.Units.gridUnit * 20
-        Layout.minimumHeight: Kirigami.Units.gridUnit * 10
+        Layout.minimumWidth: Kirigami.Units.gridUnit * 18
         Layout.preferredWidth: Kirigami.Units.gridUnit * 21
         collapseMarginsHint: true
 
@@ -278,12 +287,27 @@ PlasmoidItem {
                 wrapMode: Text.WordWrap
             }
 
-            PlasmaComponents3.Label {
+            RowLayout {
                 Layout.fillWidth: true
+                Layout.topMargin: Kirigami.Units.smallSpacing
                 visible: root.hasData
-                text: i18n("Updated %1", Qt.formatTime(new Date(root.nowMs), "HH:mm"))
-                font: Kirigami.Theme.smallFont
-                opacity: 0.6
+                spacing: Kirigami.Units.smallSpacing
+
+                PlasmaComponents3.Label {
+                    text: i18n("Updated %1", Qt.formatTime(new Date(root.nowMs), "HH:mm"))
+                    font: Kirigami.Theme.smallFont
+                    opacity: 0.6
+                }
+
+                Item {
+                    Layout.fillWidth: true
+                }
+
+                PlasmaComponents3.Label {
+                    text: root.refreshCountdownText()
+                    font: Kirigami.Theme.smallFont
+                    opacity: 0.6
+                }
             }
         }
     }
@@ -344,11 +368,19 @@ PlasmoidItem {
 
     Timer {
         id: pollTimer
-        interval: 60000
+        interval: root.pollIntervalMs
         repeat: true
         running: true
         triggeredOnStart: true
         onTriggered: root.refresh()
+    }
+
+    // Drives the live countdowns once per second, independent of the poll.
+    Timer {
+        interval: 1000
+        repeat: true
+        running: true
+        onTriggered: root.nowMs = Date.now()
     }
 
     Component.onCompleted: root.refresh()

@@ -61,7 +61,8 @@ While editing:
 ## Behavior notes
 
 - Polls every 60 seconds; the "Resets in" countdown is recomputed locally each
-  poll so it stays fresh between requests.
+  poll so it stays fresh between requests, and the footer shows a live
+  "Refreshing in Ns" countdown that updates every second.
 - On a failed request the last good values stay on screen and the error is shown
   under the meters.
 - The access token expires roughly monthly. The widget does **not** refresh it;
