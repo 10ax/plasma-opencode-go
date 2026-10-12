@@ -33,6 +33,26 @@ The widget shells out to `contents/scripts/opencode-go-usage`, which:
 
 The token is never printed or logged.
 
+## Source layout
+
+```
+contents/
+  config/main.xml             settings entries and their defaults
+  config/config.qml           registers the settings page
+  ui/main.qml                 applet shell: state, polling, tray icon, popup wiring
+  ui/UsageBody.qml            popup body: header, meter list, empty/error states, footer
+  ui/MeterRow.qml             one meter row: label, bar, percentage, reset line
+  ui/configGeneral.qml        the settings page controls
+  js/usage.js                 pure share/duration helpers (no i18n, no state)
+  scripts/opencode-go-usage   credential + API helper; prints one line of JSON
+  tests/tst_usage.qml         qmltestrunner unit tests for js/usage.js
+  icons/*.svg                 tray and placeholder icons
+```
+
+`dev.sh validate` parses the helper, `metadata.json` and `config/main.xml`, runs
+`qmllint` over every QML and JS file, runs the unit tests, and installs the
+package into a throwaway root.
+
 ## Requirements
 
 - KDE Plasma 6 (tested on 6.7.5, Wayland)
@@ -60,7 +80,8 @@ While editing:
 ```sh
 ./dev.sh upgrade    # apply changes and reload Plasma Shell
 ./dev.sh preview    # open in plasmoidviewer (needs plasma-sdk)
-./dev.sh validate   # syntax + package checks
+./dev.sh validate   # syntax + lint + unit tests + package checks
+./dev.sh test       # just the unit tests for the pure helpers
 ./dev.sh remove     # uninstall
 ```
 

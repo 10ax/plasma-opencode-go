@@ -10,6 +10,8 @@ import org.kde.plasma.extras as PlasmaExtras
 import org.kde.plasma.plasma5support as P5Support
 import org.kde.plasma.plasmoid
 
+import "../js/usage.js" as Usage
+
 PlasmoidItem {
     id: root
 
@@ -20,13 +22,12 @@ PlasmoidItem {
     readonly property int pollIntervalMs: Math.max(15, Math.min(1800,
         Number(Plasmoid.configuration.pollIntervalSeconds) || 60)) * 1000
 
-    // Populated from the helper JSON.
+    // Populated from the helper JSON. On a failed request the last good values
+    // stay put on purpose and errorText explains what went wrong.
     property var meters: []
     property string renewsAt: ""
     property bool hasData: false
-    property string errorCode: ""
     property string errorText: ""
-    property bool loading: false
 
     // Ticked every second so the "Resets in" and "Refreshing in" countdowns
     // stay live between polls.
@@ -38,17 +39,11 @@ PlasmoidItem {
     }
 
     function refresh() {
-        root.loading = true;
         root.nowMs = Date.now();
         root.nextPollMs = root.nowMs + root.pollIntervalMs;
         // The trailing comment is a cheap cache-buster: the executable engine
         // treats every distinct source string as a new request.
         executableEngine.connectSource(shellQuote(helperPath) + " json # " + Date.now());
-    }
-
-    function refreshCountdownText() {
-        const seconds = Math.max(0, Math.ceil((root.nextPollMs - root.nowMs) / 1000));
-        return i18n("Refreshing in %1s", seconds);
     }
 
     function errorMessageFor(code) {
@@ -71,13 +66,6 @@ PlasmoidItem {
         }
     }
 
-    function fraction(meter) {
-        if (!meter || !meter.limit || meter.limit <= 0) {
-            return 0;
-        }
-        return Math.max(0, Math.min(1, meter.used / meter.limit));
-    }
-
     // Maps a meter's stable key to its visibility setting, so a reworded label
     // in the API response cannot silently unhide a meter. Unknown keys stay
     // visible: better to show a meter the settings do not know about than to
@@ -97,82 +85,20 @@ PlasmoidItem {
 
     readonly property var visibleMeters: meters.filter(meterEnabled)
 
-    // The share the meters display: used, or what is left of the allowance.
-    // The traffic-light colouring in barColor() always stays keyed on the share
-    // used, so red keeps meaning "nearly out" in either mode.
-    function displayFraction(meter) {
-        const used = root.fraction(meter);
-        return Plasmoid.configuration.percentMode === "remaining" ? 1 - used : used;
+    // The worst visible meter, as "Monthly 43%": what the tooltip and the
+    // optional tray text summarize.
+    readonly property string summaryText: {
+        const worst = Usage.worstMeter(root.visibleMeters);
+        return worst ? worst.label + " " + Usage.percent(worst, Plasmoid.configuration.percentMode) + "%" : "";
     }
 
-    function percentText(meter) {
-        return Math.round(root.displayFraction(meter) * 100) + "%";
-    }
-
-    // Green/amber/red ramp driven by the theme, so the bar follows the user's
-    // colour scheme instead of a hardcoded green.
-    function barColor(value) {
-        if (value >= 0.9) {
-            return Kirigami.Theme.negativeTextColor;
-        }
-        if (value >= 0.7) {
-            return Kirigami.Theme.neutralTextColor;
-        }
-        return Kirigami.Theme.highlightColor;
-    }
+    readonly property string refreshCountdownText: i18n("Refreshing in %1s",
+        Math.max(0, Math.ceil((root.nextPollMs - root.nowMs) / 1000)))
 
     // Point size for the secondary lines. Kirigami.Theme.smallFont is the same
     // size as the default font on several themes, which leaves the sub-lines
     // without any visual hierarchy.
     readonly property int smallPointSize: Math.max(6, Kirigami.Theme.defaultFont.pointSize - 1)
-
-    function renewsText(iso) {
-        if (!iso) {
-            return "";
-        }
-        const date = new Date(iso);
-        if (isNaN(date.getTime())) {
-            return "";
-        }
-        return i18n("Renews %1", Qt.formatDate(date, "MMM d"));
-    }
-
-    function resetText(iso) {
-        if (!iso) {
-            return "";
-        }
-        const ms = new Date(iso).getTime() - root.nowMs;
-        if (!isFinite(ms)) {
-            return "";
-        }
-        if (ms <= 0) {
-            return i18n("Resets now");
-        }
-        const totalMinutes = Math.floor(ms / 60000);
-        const days = Math.floor(totalMinutes / 1440);
-        const hours = Math.floor((totalMinutes % 1440) / 60);
-        const minutes = totalMinutes % 60;
-        if (days > 0) {
-            return i18n("Resets in %1d %2h", days, hours);
-        }
-        if (hours > 0) {
-            return i18n("Resets in %1h %2m", hours, minutes);
-        }
-        return i18n("Resets in %1m", minutes);
-    }
-
-    function summaryText() {
-        if (root.visibleMeters.length === 0) {
-            return "";
-        }
-        let best = root.visibleMeters[0];
-        for (const meter of root.visibleMeters) {
-            if (root.fraction(meter) > root.fraction(best)) {
-                best = meter;
-            }
-        }
-        return best.label + " " + Math.round(root.displayFraction(best) * 100) + "%";
-    }
 
     Plasmoid.icon: "opencode-go"
     Plasmoid.status: PlasmaCore.Types.ActiveStatus
@@ -186,8 +112,7 @@ PlasmoidItem {
         if (!root.hasData) {
             return i18n("Loading…");
         }
-        const summary = root.summaryText();
-        return summary ? i18n("Go · %1", summary) : i18n("Go · no meters enabled");
+        return root.summaryText ? i18n("Go · %1", root.summaryText) : i18n("Go · no meters enabled");
     }
 
     compactRepresentation: MouseArea {
@@ -224,15 +149,13 @@ PlasmoidItem {
 
             PlasmaComponents3.Label {
                 visible: Plasmoid.configuration.showTrayText
-                text: root.summaryText()
+                text: root.summaryText
                 font.pointSize: root.smallPointSize
             }
         }
     }
 
     fullRepresentation: PlasmaExtras.Representation {
-        id: popup
-
         Layout.minimumWidth: Kirigami.Units.gridUnit * 18
         Layout.preferredWidth: Kirigami.Units.gridUnit * 21
         // The popup sizes itself from the content, so the explicit padding has
@@ -247,169 +170,19 @@ PlasmoidItem {
         topPadding: Kirigami.Units.largeSpacing
         bottomPadding: Kirigami.Units.largeSpacing
 
-        contentItem: ColumnLayout {
+        contentItem: UsageBody {
             id: body
 
-            spacing: Kirigami.Units.largeSpacing
-
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: Kirigami.Units.smallSpacing
-
-                PlasmaComponents3.Label {
-                    text: i18n("Go")
-                    font.bold: true
-                    font.pointSize: Kirigami.Theme.defaultFont.pointSize * 1.2
-                    Layout.alignment: Qt.AlignBaseline
-                }
-
-                PlasmaComponents3.Label {
-                    Layout.fillWidth: true
-                    Layout.alignment: Qt.AlignBaseline
-                    text: root.renewsText(root.renewsAt)
-                    opacity: 0.6
-                    elide: Text.ElideRight
-                }
-
-                PlasmaComponents3.Button {
-                    text: i18n("Manage")
-                    // A flat button keeps the header from being dominated by a
-                    // boxed control twice as tall as the text next to it.
-                    flat: true
-                    onClicked: Qt.openUrlExternally(root.consoleUrl)
-                }
-            }
-
-            ColumnLayout {
-                Layout.fillWidth: true
-                // Wider than the gap inside one meter (smallSpacing), so the
-                // three meters read as groups instead of six unbroken lines.
-                spacing: Math.round(Kirigami.Units.gridUnit * 0.75)
-                visible: root.visibleMeters.length > 0
-
-                Repeater {
-                    model: root.visibleMeters
-
-                    delegate: ColumnLayout {
-                        id: meterRow
-
-                        required property var modelData
-
-                        Layout.fillWidth: true
-                        spacing: Kirigami.Units.smallSpacing
-
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: Kirigami.Units.largeSpacing
-
-                            PlasmaComponents3.Label {
-                                // Fixed width so the label and the reset line
-                                // below it cannot eat the bar's space.
-                                Layout.preferredWidth: Kirigami.Units.gridUnit * 7
-                                Layout.maximumWidth: Kirigami.Units.gridUnit * 7
-                                text: meterRow.modelData.label
-                                elide: Text.ElideRight
-                            }
-
-                            Rectangle {
-                                Layout.fillWidth: true
-                                Layout.minimumWidth: Kirigami.Units.gridUnit * 4
-                                implicitHeight: Math.round(Kirigami.Units.gridUnit * 0.45)
-                                radius: height / 2
-                                color: Qt.rgba(Kirigami.Theme.textColor.r,
-                                               Kirigami.Theme.textColor.g,
-                                               Kirigami.Theme.textColor.b,
-                                               0.2)
-
-                                Rectangle {
-                                    height: parent.height
-                                    radius: parent.radius
-                                    // Floor to the radius rather than the full
-                                    // height, so a low value reads as a sliver
-                                    // and not as a slider knob.
-                                    width: Math.max(parent.radius,
-                                                    parent.width * root.displayFraction(meterRow.modelData))
-                                    color: root.barColor(root.fraction(meterRow.modelData))
-                                }
-                            }
-
-                            PlasmaComponents3.Label {
-                                Layout.preferredWidth: Kirigami.Units.gridUnit * 3
-                                Layout.maximumWidth: Kirigami.Units.gridUnit * 3
-                                text: root.percentText(meterRow.modelData)
-                                horizontalAlignment: Text.AlignRight
-                            }
-                        }
-
-                        PlasmaComponents3.Label {
-                            Layout.fillWidth: true
-                            // Line the reset text up under the label, not under
-                            // the bar, which is what made it float before.
-                            Layout.leftMargin: Kirigami.Units.gridUnit * 7 + Kirigami.Units.largeSpacing
-                            text: root.resetText(meterRow.modelData.resetsAt)
-                            font.pointSize: root.smallPointSize
-                            opacity: 0.6
-                            elide: Text.ElideRight
-                        }
-                    }
-                }
-            }
-
-            PlasmaExtras.PlaceholderMessage {
-                Layout.fillWidth: true
-                visible: root.hasData && root.visibleMeters.length === 0
-                iconName: "opencode-go"
-                text: i18n("All meters are hidden")
-                explanation: i18n("Turn at least one meter back on in the widget settings.")
-            }
-
-            PlasmaExtras.PlaceholderMessage {
-                Layout.fillWidth: true
-                visible: !root.hasData
-                iconName: "opencode-go"
-                text: root.errorText || i18n("Loading…")
-                explanation: root.errorText && root.renewsAt
-                    ? i18n("Showing the last values received.")
-                    : i18n("Reads usage from the OpenCode console API every minute.")
-            }
-
-            PlasmaComponents3.Label {
-                Layout.fillWidth: true
-                visible: root.hasData && root.errorText.length > 0
-                text: root.errorText
-                color: Kirigami.Theme.negativeTextColor
-                font.pointSize: root.smallPointSize
-                wrapMode: Text.WordWrap
-            }
-
-            Kirigami.Separator {
-                Layout.fillWidth: true
-                Layout.topMargin: Kirigami.Units.smallSpacing
-                visible: root.hasData && Plasmoid.configuration.showFooter
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
-                Layout.topMargin: Kirigami.Units.smallSpacing
-                visible: root.hasData && Plasmoid.configuration.showFooter
-                spacing: Kirigami.Units.smallSpacing
-
-                PlasmaComponents3.Label {
-                    text: i18n("Updated %1", Qt.formatTime(new Date(root.nowMs), "HH:mm"))
-                    font.pointSize: root.smallPointSize
-                    opacity: 0.6
-                }
-
-                Item {
-                    Layout.fillWidth: true
-                }
-
-                PlasmaComponents3.Label {
-                    text: root.refreshCountdownText()
-                    font.pointSize: root.smallPointSize
-                    opacity: 0.6
-                }
-            }
+            meters: root.visibleMeters
+            percentMode: Plasmoid.configuration.percentMode
+            hasData: root.hasData
+            renewsAt: root.renewsAt
+            errorText: root.errorText
+            showFooter: Plasmoid.configuration.showFooter
+            nowMs: root.nowMs
+            smallPointSize: root.smallPointSize
+            refreshText: root.refreshCountdownText
+            consoleUrl: root.consoleUrl
         }
     }
 
@@ -436,7 +209,6 @@ PlasmoidItem {
 
         onNewData: (sourceName, data) => {
             disconnectSource(sourceName);
-            root.loading = false;
 
             const stdout = String(data.stdout || "").trim();
             let payload = null;
@@ -447,7 +219,6 @@ PlasmoidItem {
             }
 
             if (!payload || typeof payload !== "object") {
-                root.errorCode = "bad-output";
                 root.errorText = root.errorMessageFor("bad-output");
                 return;
             }
@@ -456,14 +227,12 @@ PlasmoidItem {
                 root.meters = payload.meters || [];
                 root.renewsAt = payload.renewsAt || "";
                 root.hasData = root.meters.length > 0;
-                root.errorCode = "";
                 root.errorText = "";
                 return;
             }
 
-            root.errorCode = payload.error || "unknown";
-            root.errorText = root.errorMessageFor(root.errorCode);
             // Keep the last good values in root.meters on purpose.
+            root.errorText = root.errorMessageFor(payload.error || "unknown");
         }
     }
 
@@ -472,6 +241,8 @@ PlasmoidItem {
         interval: root.pollIntervalMs
         repeat: true
         running: true
+        // triggeredOnStart does the first fetch at startup, so there is no
+        // Component.onCompleted that would fetch a second time.
         triggeredOnStart: true
         onTriggered: root.refresh()
     }
@@ -483,6 +254,4 @@ PlasmoidItem {
         running: true
         onTriggered: root.nowMs = Date.now()
     }
-
-    Component.onCompleted: root.refresh()
 }

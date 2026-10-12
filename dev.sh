@@ -7,6 +7,15 @@ package_type="Plasma/Applet"
 helper="$script_dir/contents/scripts/opencode-go-usage"
 icon_theme_dir="$HOME/.local/share/icons/hicolor/scalable/apps"
 icon_files=(opencode-go.svg opencode-go-symbolic.svg)
+qml_files=(
+    contents/ui/main.qml
+    contents/ui/MeterRow.qml
+    contents/ui/UsageBody.qml
+    contents/ui/configGeneral.qml
+    contents/config/config.qml
+)
+js_files=(contents/js/usage.js)
+test_dir="contents/tests"
 
 usage() {
     cat <<'USAGE'
@@ -22,7 +31,8 @@ Commands:
   reload       Restart Plasma Shell without logging out.
   preview      Open the plasmoid in plasmoidviewer (needs plasma-sdk).
   status       Show the installed package info.
-  validate     Run lightweight syntax/package checks.
+  validate     Run syntax, lint, unit-test and package checks.
+  test         Run the QML unit tests for the pure helpers.
 
 Typical loop while editing:
   ./dev.sh upgrade
@@ -103,6 +113,92 @@ doctor() {
     "$helper" doctor
 }
 
+# Resolve qmllint, which is frequently not on PATH on Arch.
+qmllint_bin() {
+    if have qmllint; then
+        command -v qmllint
+    elif [ -x /usr/lib/qt6/bin/qmllint ]; then
+        printf '%s\n' /usr/lib/qt6/bin/qmllint
+    else
+        return 1
+    fi
+}
+
+# Resolve qmltestrunner the same way.
+qmltest_bin() {
+    if have qmltestrunner; then
+        command -v qmltestrunner
+    elif [ -x /usr/lib/qt6/bin/qmltestrunner ]; then
+        printf '%s\n' /usr/lib/qt6/bin/qmltestrunner
+    else
+        return 1
+    fi
+}
+
+# Where Qt keeps its own QML modules. This only helps qmllint resolve the
+# org.kde.* imports; on most installs it finds them without a hint.
+qml_import_path() {
+    if have qtpaths6; then
+        qtpaths6 --query QT_INSTALL_QML
+    elif have qmake6; then
+        qmake6 -query QT_INSTALL_QML
+    elif [ -d /usr/lib/qt6/qml ]; then
+        printf '%s\n' /usr/lib/qt6/qml
+    fi
+}
+
+check_qml() {
+    local lint
+    lint=$(qmllint_bin) || true
+    if [ -z "$lint" ]; then
+        printf 'skip: qmllint not found, QML not linted\n'
+        return 0
+    fi
+
+    local import_path
+    import_path=$(qml_import_path) || true
+
+    local -a lint_targets=("${qml_files[@]}" "${js_files[@]}")
+    local -a lint_args=()
+    if [ -n "$import_path" ]; then
+        lint_args=(-I "$import_path")
+    fi
+    lint_args+=("${lint_targets[@]}")
+
+    # The plasmoid host injects i18n() at runtime, so qmllint reports every call
+    # as an unqualified access. Drop only the warnings whose own source line is
+    # an i18n call — a genuinely unqualified name still fails the check. The
+    # `|| true` keeps `set -e` out of it when qmllint exits non-zero on errors:
+    # the failure is reported through the pipeline's output, not its status.
+    local output
+    output=$("$lint" "${lint_args[@]}" 2>&1 | awk '
+        /^(Warning|Error):/ {
+            warning = $0
+            getline source
+            if (warning ~ /Unqualified access \[unqualified\]$/ && source ~ /i18n[cndp]*\(/) {
+                next
+            }
+            print warning
+        }' || true)
+
+    if [ -n "$output" ]; then
+        printf '%s\n' "$output"
+        return 1
+    fi
+    printf 'ok: qmllint clean (%s files)\n' "${#lint_targets[@]}"
+}
+
+# Unit tests for the pure helpers in js/usage.js. Headless by design.
+run_tests() {
+    local runner
+    runner=$(qmltest_bin) || true
+    if [ -z "$runner" ]; then
+        printf 'skip: qmltestrunner not found (usually in qt6-declarative)\n'
+        return 0
+    fi
+    QT_QPA_PLATFORM=offscreen "$runner" -input "$script_dir/$test_dir"
+}
+
 validate() {
     local failed=0
 
@@ -127,17 +223,21 @@ validate() {
         printf 'fail: config/main.xml does not parse\n'
         failed=1
     fi
+    check_qml || failed=1
+
+    printf '== tests ==\n'
+    run_tests || failed=1
 
     printf '== files ==\n'
     for file in \
         metadata.json \
         contents/config/main.xml \
-        contents/config/config.qml \
-        contents/ui/main.qml \
-        contents/ui/configGeneral.qml \
         contents/scripts/opencode-go-usage \
         contents/icons/opencode-go-symbolic.svg \
-        contents/icons/opencode-go.svg; do
+        contents/icons/opencode-go.svg \
+        "$test_dir/tst_usage.qml" \
+        "${qml_files[@]}" \
+        "${js_files[@]}"; do
         if [ -e "$script_dir/$file" ]; then
             printf 'ok: %s\n' "$file"
         else
@@ -209,6 +309,7 @@ case "${1:-}" in
         kpackagetool6 --type "$package_type" --show "$package_id"
         ;;
     validate) validate ;;
+    test) run_tests ;;
     -h|--help|help) usage ;;
     *) usage >&2; exit 64 ;;
 esac
