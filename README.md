@@ -39,12 +39,15 @@ The token is never printed or logged.
 
 ```sh
 ./dev.sh doctor     # dependencies, credentials, one live API probe
-./dev.sh install    # install for the current user + reload Plasma Shell
 ./dev.sh usage      # print the exact JSON the widget consumes
+./dev.sh install    # install for the current user + reload Plasma Shell
 ```
 
-Then add **OpenCode Go Usage** to your system tray: right click the tray →
-*Configure System Tray* → *Entries* → enable the widget.
+`install` also copies the icons into `~/.local/share/icons/hicolor/scalable/apps/`
+so the panel can resolve them by name; `remove` takes them away again.
+
+Then add the widget to your system tray: right click the tray → *Configure System
+Tray* → *Entries* → enable **OpenCode Go Usage**.
 
 While editing:
 
