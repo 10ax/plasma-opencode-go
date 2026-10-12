@@ -1,7 +1,6 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import QtQuick.Controls as QQC2
 import QtQuick.Layouts
 
 import org.kde.kirigami as Kirigami
@@ -194,36 +193,39 @@ PlasmoidItem {
     compactRepresentation: MouseArea {
         id: compactMouseArea
 
-        implicitWidth: compactRow.implicitWidth
-        implicitHeight: compactRow.implicitHeight
+        // Only one tooltip here: the native applet one built from
+        // toolTipMainText / toolTipSubText above. A QQC2.ToolTip on this
+        // MouseArea would open a second, clipped bubble on top of it.
+
+        // The tray hands us the panel's icon size as our height. With the
+        // percentage text off we ask for no width of our own, so the tray keeps
+        // giving us that square slot; with it on we widen to fit the text.
+        anchors.fill: parent
+        implicitWidth: Plasmoid.configuration.showTrayText ? compactRow.implicitWidth : 0
         hoverEnabled: true
 
-        QQC2.ToolTip.visible: containsMouse
-        QQC2.ToolTip.text: root.toolTipSubText
-        QQC2.ToolTip.delay: Kirigami.Units.toolTipDelay
-
-        // Open the popup on click only.
         onClicked: root.expanded = !root.expanded
 
         RowLayout {
             id: compactRow
 
-            anchors.fill: parent
+            anchors.centerIn: parent
             spacing: Kirigami.Units.smallSpacing
 
             Kirigami.Icon {
                 source: Plasmoid.icon
                 active: compactMouseArea.containsMouse
-                implicitWidth: Kirigami.Units.iconSizes.smallMedium
-                implicitHeight: Kirigami.Units.iconSizes.smallMedium
-                Layout.alignment: Qt.AlignVCenter
+                // Square, and as large as the slot allows.
+                implicitWidth: compactMouseArea.height > 0
+                    ? compactMouseArea.height
+                    : Kirigami.Units.iconSizes.medium
+                implicitHeight: implicitWidth
             }
 
             PlasmaComponents3.Label {
                 visible: Plasmoid.configuration.showTrayText
                 text: root.summaryText()
                 font.pointSize: root.smallPointSize
-                Layout.alignment: Qt.AlignVCenter
             }
         }
     }
