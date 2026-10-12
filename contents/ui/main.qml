@@ -79,8 +79,25 @@ PlasmoidItem {
     }
 
     function percentText(meter) {
-        return Math.round(root.fraction(meter) * 100) + "% used";
+        return Math.round(root.fraction(meter) * 100) + "%";
     }
+
+    // Green/amber/red ramp driven by the theme, so the bar follows the user's
+    // colour scheme instead of a hardcoded green.
+    function barColor(value) {
+        if (value >= 0.9) {
+            return Kirigami.Theme.negativeTextColor;
+        }
+        if (value >= 0.7) {
+            return Kirigami.Theme.neutralTextColor;
+        }
+        return Kirigami.Theme.highlightColor;
+    }
+
+    // Point size for the secondary lines. Kirigami.Theme.smallFont is the same
+    // size as the default font on several themes, which leaves the sub-lines
+    // without any visual hierarchy.
+    readonly property int smallPointSize: Math.max(6, Kirigami.Theme.defaultFont.pointSize - 1)
 
     function renewsText(iso) {
         if (!iso) {
@@ -194,10 +211,12 @@ PlasmoidItem {
                     text: i18n("Go")
                     font.bold: true
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize * 1.2
+                    Layout.alignment: Qt.AlignBaseline
                 }
 
                 PlasmaComponents3.Label {
                     Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignBaseline
                     text: root.renewsText(root.renewsAt)
                     opacity: 0.6
                     elide: Text.ElideRight
@@ -205,13 +224,18 @@ PlasmoidItem {
 
                 PlasmaComponents3.Button {
                     text: i18n("Manage")
+                    // A flat button keeps the header from being dominated by a
+                    // boxed control twice as tall as the text next to it.
+                    flat: true
                     onClicked: Qt.openUrlExternally(root.consoleUrl)
                 }
             }
 
             ColumnLayout {
                 Layout.fillWidth: true
-                spacing: Kirigami.Units.largeSpacing
+                // Wider than the gap inside one meter (smallSpacing), so the
+                // three meters read as groups instead of six unbroken lines.
+                spacing: Math.round(Kirigami.Units.gridUnit * 0.75)
                 visible: root.hasData
 
                 Repeater {
@@ -229,31 +253,19 @@ PlasmoidItem {
                             Layout.fillWidth: true
                             spacing: Kirigami.Units.largeSpacing
 
-                            ColumnLayout {
-                                // Fixed width: the un-elided "Resets in ..." text
-                                // would otherwise set a huge implicit width and
-                                // starve the bar.
+                            PlasmaComponents3.Label {
+                                // Fixed width so the label and the reset line
+                                // below it cannot eat the bar's space.
                                 Layout.preferredWidth: Kirigami.Units.gridUnit * 7
                                 Layout.maximumWidth: Kirigami.Units.gridUnit * 7
-                                spacing: 0
-
-                                PlasmaComponents3.Label {
-                                    text: meterRow.modelData.label
-                                }
-
-                                PlasmaComponents3.Label {
-                                    Layout.fillWidth: true
-                                    text: root.resetText(meterRow.modelData.resetsAt)
-                                    font: Kirigami.Theme.smallFont
-                                    opacity: 0.6
-                                    elide: Text.ElideRight
-                                }
+                                text: meterRow.modelData.label
+                                elide: Text.ElideRight
                             }
 
                             Rectangle {
                                 Layout.fillWidth: true
                                 Layout.minimumWidth: Kirigami.Units.gridUnit * 4
-                                implicitHeight: Math.round(Kirigami.Units.gridUnit * 0.55)
+                                implicitHeight: Math.round(Kirigami.Units.gridUnit * 0.45)
                                 radius: height / 2
                                 color: Qt.rgba(Kirigami.Theme.textColor.r,
                                                Kirigami.Theme.textColor.g,
@@ -263,18 +275,32 @@ PlasmoidItem {
                                 Rectangle {
                                     height: parent.height
                                     radius: parent.radius
-                                    width: Math.max(parent.height,
+                                    // Floor to the radius rather than the full
+                                    // height, so a low value reads as a sliver
+                                    // and not as a slider knob.
+                                    width: Math.max(parent.radius,
                                                     parent.width * root.fraction(meterRow.modelData))
-                                    color: "#4ec26a"
+                                    color: root.barColor(root.fraction(meterRow.modelData))
                                 }
                             }
 
                             PlasmaComponents3.Label {
-                                Layout.preferredWidth: Kirigami.Units.gridUnit * 5
-                                Layout.maximumWidth: Kirigami.Units.gridUnit * 5
+                                Layout.preferredWidth: Kirigami.Units.gridUnit * 3
+                                Layout.maximumWidth: Kirigami.Units.gridUnit * 3
                                 text: root.percentText(meterRow.modelData)
                                 horizontalAlignment: Text.AlignRight
                             }
+                        }
+
+                        PlasmaComponents3.Label {
+                            Layout.fillWidth: true
+                            // Line the reset text up under the label, not under
+                            // the bar, which is what made it float before.
+                            Layout.leftMargin: Kirigami.Units.gridUnit * 7 + Kirigami.Units.largeSpacing
+                            text: root.resetText(meterRow.modelData.resetsAt)
+                            font.pointSize: root.smallPointSize
+                            opacity: 0.6
+                            elide: Text.ElideRight
                         }
                     }
                 }
@@ -295,8 +321,14 @@ PlasmoidItem {
                 visible: root.hasData && root.errorText.length > 0
                 text: root.errorText
                 color: Kirigami.Theme.negativeTextColor
-                font: Kirigami.Theme.smallFont
+                font.pointSize: root.smallPointSize
                 wrapMode: Text.WordWrap
+            }
+
+            Kirigami.Separator {
+                Layout.fillWidth: true
+                Layout.topMargin: Kirigami.Units.smallSpacing
+                visible: root.hasData
             }
 
             RowLayout {
@@ -307,7 +339,7 @@ PlasmoidItem {
 
                 PlasmaComponents3.Label {
                     text: i18n("Updated %1", Qt.formatTime(new Date(root.nowMs), "HH:mm"))
-                    font: Kirigami.Theme.smallFont
+                    font.pointSize: root.smallPointSize
                     opacity: 0.6
                 }
 
@@ -317,7 +349,7 @@ PlasmoidItem {
 
                 PlasmaComponents3.Label {
                     text: root.refreshCountdownText()
-                    font: Kirigami.Theme.smallFont
+                    font.pointSize: root.smallPointSize
                     opacity: 0.6
                 }
             }
