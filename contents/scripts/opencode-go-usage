@@ -1,0 +1,192 @@
+#!/usr/bin/env bash
+#
+# opencode-go-usage — read OpenCode "Go" plan usage from the OpenCode console API.
+#
+# The console (https://opencode.ai/console) serves the rolling / weekly / monthly
+# Go-plan meters from:
+#
+#   GET https://opencode.ai/console/api/go/status
+#   Authorization: Bearer <access token>
+#
+# The access token is the one the OpenCode CLI already stores for the "opencode"
+# integration. We read it straight from the CLI database (read-only) and fall
+# back to `opencode auth export`. The token is never printed.
+#
+# This script always exits 0 and always prints a single line of JSON so that the
+# calling plasmoid never has to deal with shell failures.
+#
+# Subcommands:
+#   json     Print the normalized usage JSON (default).
+#   doctor   Print a human-readable health report.
+#
+set -euo pipefail
+
+API_URL="https://opencode.ai/console/api/go/status"
+OPENCODE_DB="${OPENCODE_DB:-$HOME/.local/share/opencode/opencode.db}"
+HTTP_TIMEOUT="${OPENCODE_GO_HTTP_TIMEOUT:-20}"
+
+usage() {
+    cat <<'USAGE'
+Usage: opencode-go-usage [json|doctor]
+
+  json     Print normalized Go-plan usage as a single JSON line (default).
+  doctor   Print a health report (dependencies, token, live probe).
+
+Environment:
+  OPENCODE_DB=/path/to/opencode.db      Override the credential database path.
+  OPENCODE_GO_HTTP_TIMEOUT=20           curl timeout in seconds.
+USAGE
+}
+
+have() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# Emit an error payload and stop successfully.
+json_error() {
+    printf '{"ok":false,"error":"%s"}\n' "$1"
+    exit 0
+}
+
+# Read the access token from the OpenCode CLI credential database.
+token_from_db() {
+    have sqlite3 || return 1
+    [ -r "$OPENCODE_DB" ] || return 1
+
+    local value
+    value=$(sqlite3 "file:${OPENCODE_DB}?mode=ro&immutable=1" \
+        "select value from credential where integration_id='opencode' and active=1 limit 1;" 2>/dev/null) || return 1
+    [ -n "$value" ] || return 1
+
+    printf '%s' "$value" | jq -r '(.access // "") | select(length > 0)' 2>/dev/null
+}
+
+# Fall back to the CLI itself (it also refreshes credentials on demand).
+token_from_cli() {
+    have opencode || return 1
+    opencode auth export 2>/dev/null \
+        | jq -r 'map(select(.integrationID == "opencode" and .active == true)) | (.[0].value.access // "") | select(length > 0)' 2>/dev/null
+}
+
+get_token() {
+    # Escape hatch for testing/debugging; normally credentials come from the CLI.
+    if [ -n "${OPENCODE_GO_TOKEN:-}" ]; then
+        printf '%s' "$OPENCODE_GO_TOKEN"
+        return 0
+    fi
+    token_from_db || token_from_cli
+}
+
+# Fetch the raw API response into $1. Prints the HTTP status code on stdout,
+# or "000" when the request never reached the server.
+fetch_status() {
+    local destination="$1" token="$2"
+    curl -sS --max-time "$HTTP_TIMEOUT" \
+        -o "$destination" -w '%{http_code}' \
+        -H "Authorization: Bearer ${token}" \
+        -H "Accept: application/json" \
+        -H "User-Agent: opencode-go-plasmoid" \
+        "$API_URL" 2>/dev/null || printf '000'
+}
+
+cmd_json() {
+    have curl || json_error "missing-curl"
+    have jq || json_error "missing-jq"
+
+    local token
+    token=$(get_token || true)
+    [ -n "${token:-}" ] || json_error "notoken"
+
+    local code
+    # Global on purpose: the EXIT trap below runs after this function returns,
+    # when locals no longer exist.
+    TMPFILE=$(mktemp)
+    trap 'rm -f "${TMPFILE:-}"' EXIT
+
+    code=$(fetch_status "$TMPFILE" "$token")
+    case "$code" in
+        200) ;;
+        401) json_error "unauthorized" ;;
+        402) json_error "payment-required" ;;
+        000) json_error "network" ;;
+        *) json_error "http-${code}" ;;
+    esac
+
+    jq -e . "$TMPFILE" >/dev/null 2>&1 || json_error "bad-response"
+
+    jq -c '
+        def meter($key; $label):
+            (.access.meters[$key] // null) as $m
+            | if $m == null then empty
+              else {
+                key: $key,
+                label: $label,
+                used: (($m.usedMicroCents  // "0") | tonumber? // 0),
+                limit: (($m.limitMicroCents // "0") | tonumber? // 0),
+                resetsAt: ($m.resetsAt // null)
+              }
+              end;
+
+        {
+            ok: true,
+            product: (.product // null),
+            renewsAt: (.access.endsAt // null),
+            cancelAtPeriodEnd: (.cancelAtPeriodEnd // false),
+            updatedAt: (now | todateiso8601),
+            meters: [
+                meter("fiveHour"; "Rolling"),
+                meter("week";     "Weekly"),
+                meter("month";    "Monthly")
+            ]
+        }
+    ' "$TMPFILE"
+}
+
+cmd_doctor() {
+    local failed=0
+
+    for command_name in curl jq sqlite3 opencode; do
+        if have "$command_name"; then
+            printf 'ok:      %s -> %s\n' "$command_name" "$(command -v "$command_name")"
+        else
+            printf 'missing: %s\n' "$command_name"
+            [ "$command_name" = "opencode" ] || failed=1
+        fi
+    done
+
+    printf 'db:      %s (%s)\n' "$OPENCODE_DB" \
+        "$([ -r "$OPENCODE_DB" ] && echo readable || echo unreadable)"
+
+    local token
+    token=$(get_token || true)
+    if [ -n "${token:-}" ]; then
+        printf 'token:   present (len %s)\n' "${#token}"
+    else
+        printf 'token:   MISSING — run: opencode auth login\n'
+        failed=1
+    fi
+
+    if [ -n "${token:-}" ]; then
+        local tmp code
+        tmp=$(mktemp)
+        code=$(fetch_status "$tmp" "$token")
+        rm -f "$tmp"
+        if [ "$code" = "200" ]; then
+            printf 'api:     ok (HTTP %s)\n' "$code"
+            printf 'usage:   %s\n' "$(cmd_json)"
+        else
+            printf 'api:     FAILED (HTTP %s)\n' "$code"
+            failed=1
+        fi
+    fi
+
+    [ "$failed" -eq 0 ] && printf 'result:  ok\n' || printf 'result:  problems found\n'
+    return 0
+}
+
+case "${1:-json}" in
+    json)   cmd_json ;;
+    doctor) cmd_doctor ;;
+    -h|--help|help) usage ;;
+    *) usage >&2; json_error "unknown-command" ;;
+esac
