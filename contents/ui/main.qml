@@ -171,6 +171,13 @@ PlasmoidItem {
         Layout.preferredWidth: Kirigami.Units.gridUnit * 21
         collapseMarginsHint: true
 
+        // Guarantee an even inset on every edge instead of relying on the
+        // theme's dialog-background metrics.
+        leftPadding: Kirigami.Units.largeSpacing
+        rightPadding: Kirigami.Units.largeSpacing
+        topPadding: Kirigami.Units.largeSpacing
+        bottomPadding: Kirigami.Units.largeSpacing
+
         contentItem: ColumnLayout {
             spacing: Kirigami.Units.largeSpacing
 
@@ -241,7 +248,7 @@ PlasmoidItem {
                             Rectangle {
                                 Layout.fillWidth: true
                                 Layout.minimumWidth: Kirigami.Units.gridUnit * 4
-                                implicitHeight: Math.round(Kirigami.Units.gridUnit * 0.6)
+                                implicitHeight: Math.round(Kirigami.Units.gridUnit * 0.55)
                                 radius: height / 2
                                 color: Qt.rgba(Kirigami.Theme.textColor.r,
                                                Kirigami.Theme.textColor.g,
