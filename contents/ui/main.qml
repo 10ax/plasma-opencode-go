@@ -18,7 +18,8 @@ PlasmoidItem {
 
     readonly property string consoleUrl: "https://opencode.ai/console"
 
-    readonly property int pollIntervalMs: 60000
+    readonly property int pollIntervalMs: Math.max(15, Math.min(1800,
+        Number(Plasmoid.configuration.pollIntervalSeconds) || 60)) * 1000
 
     // Populated from the helper JSON.
     property var meters: []
@@ -78,8 +79,35 @@ PlasmoidItem {
         return Math.max(0, Math.min(1, meter.used / meter.limit));
     }
 
+    // Maps a meter's stable key to its visibility setting, so a reworded label
+    // in the API response cannot silently unhide a meter. Unknown keys stay
+    // visible: better to show a meter the settings do not know about than to
+    // hide data.
+    function meterEnabled(meter) {
+        switch (meter && meter.key) {
+        case "fiveHour":
+            return Plasmoid.configuration.showRolling;
+        case "week":
+            return Plasmoid.configuration.showWeekly;
+        case "month":
+            return Plasmoid.configuration.showMonthly;
+        default:
+            return true;
+        }
+    }
+
+    readonly property var visibleMeters: meters.filter(meterEnabled)
+
+    // The share the meters display: used, or what is left of the allowance.
+    // The traffic-light colouring in barColor() always stays keyed on the share
+    // used, so red keeps meaning "nearly out" in either mode.
+    function displayFraction(meter) {
+        const used = root.fraction(meter);
+        return Plasmoid.configuration.percentMode === "remaining" ? 1 - used : used;
+    }
+
     function percentText(meter) {
-        return Math.round(root.fraction(meter) * 100) + "%";
+        return Math.round(root.displayFraction(meter) * 100) + "%";
     }
 
     // Green/amber/red ramp driven by the theme, so the bar follows the user's
@@ -135,16 +163,16 @@ PlasmoidItem {
     }
 
     function summaryText() {
-        if (root.meters.length === 0) {
-            return root.hasData ? "" : i18n("No data");
+        if (root.visibleMeters.length === 0) {
+            return "";
         }
-        let best = root.meters[0];
-        for (const meter of root.meters) {
+        let best = root.visibleMeters[0];
+        for (const meter of root.visibleMeters) {
             if (root.fraction(meter) > root.fraction(best)) {
                 best = meter;
             }
         }
-        return best.label + " " + Math.round(root.fraction(best) * 100) + "%";
+        return best.label + " " + Math.round(root.displayFraction(best) * 100) + "%";
     }
 
     Plasmoid.icon: "opencode-go"
@@ -156,15 +184,18 @@ PlasmoidItem {
         if (root.errorText) {
             return root.errorText;
         }
-        return root.hasData
-            ? i18n("Go · %1", root.summaryText())
-            : i18n("Loading…");
+        if (!root.hasData) {
+            return i18n("Loading…");
+        }
+        const summary = root.summaryText();
+        return summary ? i18n("Go · %1", summary) : i18n("Go · no meters enabled");
     }
 
     compactRepresentation: MouseArea {
         id: compactMouseArea
 
-        anchors.fill: parent
+        implicitWidth: compactRow.implicitWidth
+        implicitHeight: compactRow.implicitHeight
         hoverEnabled: true
 
         QQC2.ToolTip.visible: containsMouse
@@ -174,10 +205,26 @@ PlasmoidItem {
         // Open the popup on click only.
         onClicked: root.expanded = !root.expanded
 
-        Kirigami.Icon {
+        RowLayout {
+            id: compactRow
+
             anchors.fill: parent
-            source: Plasmoid.icon
-            active: compactMouseArea.containsMouse
+            spacing: Kirigami.Units.smallSpacing
+
+            Kirigami.Icon {
+                source: Plasmoid.icon
+                active: compactMouseArea.containsMouse
+                implicitWidth: Kirigami.Units.iconSizes.smallMedium
+                implicitHeight: Kirigami.Units.iconSizes.smallMedium
+                Layout.alignment: Qt.AlignVCenter
+            }
+
+            PlasmaComponents3.Label {
+                visible: Plasmoid.configuration.showTrayText
+                text: root.summaryText()
+                font.pointSize: root.smallPointSize
+                Layout.alignment: Qt.AlignVCenter
+            }
         }
     }
 
@@ -236,10 +283,10 @@ PlasmoidItem {
                 // Wider than the gap inside one meter (smallSpacing), so the
                 // three meters read as groups instead of six unbroken lines.
                 spacing: Math.round(Kirigami.Units.gridUnit * 0.75)
-                visible: root.hasData
+                visible: root.visibleMeters.length > 0
 
                 Repeater {
-                    model: root.meters
+                    model: root.visibleMeters
 
                     delegate: ColumnLayout {
                         id: meterRow
@@ -279,7 +326,7 @@ PlasmoidItem {
                                     // height, so a low value reads as a sliver
                                     // and not as a slider knob.
                                     width: Math.max(parent.radius,
-                                                    parent.width * root.fraction(meterRow.modelData))
+                                                    parent.width * root.displayFraction(meterRow.modelData))
                                     color: root.barColor(root.fraction(meterRow.modelData))
                                 }
                             }
@@ -308,6 +355,14 @@ PlasmoidItem {
 
             PlasmaExtras.PlaceholderMessage {
                 Layout.fillWidth: true
+                visible: root.hasData && root.visibleMeters.length === 0
+                iconName: "opencode-go"
+                text: i18n("All meters are hidden")
+                explanation: i18n("Turn at least one meter back on in the widget settings.")
+            }
+
+            PlasmaExtras.PlaceholderMessage {
+                Layout.fillWidth: true
                 visible: !root.hasData
                 iconName: "opencode-go"
                 text: root.errorText || i18n("Loading…")
@@ -328,13 +383,13 @@ PlasmoidItem {
             Kirigami.Separator {
                 Layout.fillWidth: true
                 Layout.topMargin: Kirigami.Units.smallSpacing
-                visible: root.hasData
+                visible: root.hasData && Plasmoid.configuration.showFooter
             }
 
             RowLayout {
                 Layout.fillWidth: true
                 Layout.topMargin: Kirigami.Units.smallSpacing
-                visible: root.hasData
+                visible: root.hasData && Plasmoid.configuration.showFooter
                 spacing: Kirigami.Units.smallSpacing
 
                 PlasmaComponents3.Label {

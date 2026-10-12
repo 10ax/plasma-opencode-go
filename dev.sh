@@ -119,11 +119,22 @@ validate() {
         printf 'fail: metadata.json\n'
         failed=1
     fi
+    if ! have xmllint; then
+        printf 'skip: xmllint not installed, config/main.xml unchecked\n'
+    elif xmllint --noout "$script_dir/contents/config/main.xml"; then
+        printf 'ok: config/main.xml parses\n'
+    else
+        printf 'fail: config/main.xml does not parse\n'
+        failed=1
+    fi
 
     printf '== files ==\n'
     for file in \
         metadata.json \
+        contents/config/main.xml \
+        contents/config/config.qml \
         contents/ui/main.qml \
+        contents/ui/configGeneral.qml \
         contents/scripts/opencode-go-usage \
         contents/icons/opencode-go-symbolic.svg \
         contents/icons/opencode-go.svg; do

@@ -6,13 +6,19 @@ tray icon to open the popup; it does not steal focus otherwise.
 
 ```
 Go                      Renews Nov 1                 [ Manage ]
-Rolling     [██████░░░░░░░░░░░░░░░░]                       9% used
+Rolling     [█░░░░░░░░░░░░░░░░░░░░░]                       3%
             Resets in 0h 6m
-Weekly      [█░░░░░░░░░░░░░░░░░░░░░]                       3% used
+Weekly      [█░░░░░░░░░░░░░░░░░░░░░]                       7%
             Resets in 6d 11h
-Monthly     [█████████░░░░░░░░░░░░░]                      41% used
+Monthly     [█████████░░░░░░░░░░░░░]                      43%
             Resets in 19d 22h
+──────────────────────────────────────────────────────────────
+Updated 16:29                              Refreshing in 5s
 ```
+
+The bar sits on the label's line; the reset countdown is indented under the
+label. The percentage and the bar show the share used by default and can be
+switched to the share remaining in the settings.
 
 ## How it works
 
@@ -58,16 +64,36 @@ While editing:
 ./dev.sh remove     # uninstall
 ```
 
+## Settings
+
+Right click the tray icon → *Configure OpenCode Go Usage…*. The **General** page
+has:
+
+| Setting | Default | Notes |
+|---|---|---|
+| Refresh every | 60 s | Clamped to 15–1800 s |
+| Meters: Rolling / Weekly / Monthly | all on | Hidden meters are dropped from the popup and from the tooltip |
+| Show last update and next refresh | on | Hides the footer row and its separator |
+| Show | Percentage used | Or *Percentage remaining* — switches both the number and the bar |
+| Show the percentage next to the tray icon | off | e.g. `Monthly 43%` next to the tray icon |
+
+The settings live in `~/.config/plasma-org.kde.plasma.desktop-appletsrc`, defined
+by `contents/config/main.xml` and edited through
+`contents/ui/configGeneral.qml`. Turning every meter off is allowed: the popup
+then says so instead of showing an empty list.
+
 ## Behavior notes
 
-- Polls every 60 seconds; the "Resets in" countdown is recomputed locally each
-  poll so it stays fresh between requests, and the footer shows a live
-  "Refreshing in Ns" countdown that updates every second.
+- Polls every 60 seconds by default (see **Settings**); the "Resets in" countdown
+  is recomputed locally each second so it stays fresh between requests, and the
+  footer shows a live "Refreshing in Ns" countdown.
 - On a failed request the last good values stay on screen and the error is shown
   under the meters.
 - The access token expires roughly monthly. The widget does **not** refresh it;
   when the console returns 401 the popup asks you to run
   `opencode auth login`.
+- The bar is filled with the theme highlight colour and turns amber above 70%
+  and red above 90% **of the share used**, whichever percentage mode is active.
 
 ## Icon
 

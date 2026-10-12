@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0
+      http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+  <kcfgfile name=""/>
+
+  <group name="General">
+    <entry name="pollIntervalSeconds" type="Int">
+      <label>Seconds between usage requests to the OpenCode console.</label>
+      <default>60</default>
+    </entry>
+    <entry name="showRolling" type="Bool">
+      <label>Show the rolling (5 hour) meter.</label>
+      <default>true</default>
+    </entry>
+    <entry name="showWeekly" type="Bool">
+      <label>Show the weekly meter.</label>
+      <default>true</default>
+    </entry>
+    <entry name="showMonthly" type="Bool">
+      <label>Show the monthly meter.</label>
+      <default>true</default>
+    </entry>
+    <entry name="showFooter" type="Bool">
+      <label>Show the footer with the last update time and the next refresh countdown.</label>
+      <default>true</default>
+    </entry>
+    <entry name="percentMode" type="String">
+      <label>Whether the meters report the share used or the share remaining: "used" or "remaining".</label>
+      <default>used</default>
+    </entry>
+    <entry name="showTrayText" type="Bool">
+      <label>Show the worst meter's percentage next to the tray icon.</label>
+      <default>false</default>
+    </entry>
+  </group>
+</kcfg>
