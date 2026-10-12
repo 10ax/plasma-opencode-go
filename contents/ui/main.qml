@@ -120,7 +120,7 @@ PlasmoidItem {
         return best.label + " " + Math.round(root.fraction(best) * 100) + "%";
     }
 
-    Plasmoid.icon: "opencode-go-symbolic"
+    Plasmoid.icon: "opencode-go"
     Plasmoid.status: PlasmaCore.Types.ActiveStatus
     Plasmoid.title: i18n("OpenCode Go Usage")
 
@@ -209,7 +209,11 @@ PlasmoidItem {
                             spacing: Kirigami.Units.largeSpacing
 
                             ColumnLayout {
-                                Layout.preferredWidth: Kirigami.Units.gridUnit * 6
+                                // Fixed width: the un-elided "Resets in ..." text
+                                // would otherwise set a huge implicit width and
+                                // starve the bar.
+                                Layout.preferredWidth: Kirigami.Units.gridUnit * 7
+                                Layout.maximumWidth: Kirigami.Units.gridUnit * 7
                                 spacing: 0
 
                                 PlasmaComponents3.Label {
@@ -227,12 +231,13 @@ PlasmoidItem {
 
                             Rectangle {
                                 Layout.fillWidth: true
+                                Layout.minimumWidth: Kirigami.Units.gridUnit * 4
                                 implicitHeight: Math.round(Kirigami.Units.gridUnit * 0.6)
                                 radius: height / 2
                                 color: Qt.rgba(Kirigami.Theme.textColor.r,
                                                Kirigami.Theme.textColor.g,
                                                Kirigami.Theme.textColor.b,
-                                               0.15)
+                                               0.2)
 
                                 Rectangle {
                                     height: parent.height
@@ -244,7 +249,8 @@ PlasmoidItem {
                             }
 
                             PlasmaComponents3.Label {
-                                Layout.preferredWidth: Kirigami.Units.gridUnit * 6
+                                Layout.preferredWidth: Kirigami.Units.gridUnit * 5
+                                Layout.maximumWidth: Kirigami.Units.gridUnit * 5
                                 text: root.percentText(meterRow.modelData)
                                 horizontalAlignment: Text.AlignRight
                             }
@@ -256,7 +262,7 @@ PlasmoidItem {
             PlasmaExtras.PlaceholderMessage {
                 Layout.fillWidth: true
                 visible: !root.hasData
-                iconName: "opencode-go-symbolic"
+                iconName: "opencode-go"
                 text: root.errorText || i18n("Loading…")
                 explanation: root.errorText && root.renewsAt
                     ? i18n("Showing the last values received.")

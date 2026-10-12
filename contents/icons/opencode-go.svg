@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- OpenCode mark, standalone light-on-dark variant (see README for attribution). -->
+<!-- OpenCode mark with its brand tile (see README for attribution). -->
 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" version="1.1">
+    <rect width="24" height="24" rx="5" fill="#131010"/>
+    <path fill="#5A5858" d="M15 10.5V16.5H9V10.5H15Z"/>
     <path fill="#CFCECD" fill-rule="evenodd" clip-rule="evenodd"
-          d="M20 22H4V2H20V22ZM16 6H8V18H16V6Z"/>
-    <path fill="#656363"
-          d="M16 10V18H8V10H16Z"/>
+          d="M18 19.5H6V4.5H18V19.5ZM15 7.5H9V16.5H15V7.5Z"/>
 </svg>
