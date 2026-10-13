@@ -1,10 +1,13 @@
 // One meter: name, progress bar, percentage, and the reset countdown under the
-// name. Purely presentational — the parent computes every value it shows.
+// name. It receives every value from the parent and only turns the share into
+// pixels, through the shared helper in js/usage.js.
 import QtQuick
 import QtQuick.Layouts
 
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.components as PlasmaComponents3
+
+import "../js/usage.js" as Usage
 
 ColumnLayout {
     id: meterRow
@@ -49,9 +52,10 @@ ColumnLayout {
             Rectangle {
                 height: parent.height
                 radius: parent.radius
-                // Floor to the radius rather than the full height, so a low
-                // value reads as a sliver and not as a slider knob.
-                width: Math.max(parent.radius, parent.width * meterRow.displayFraction)
+                // A zero share leaves the track empty; a small non-zero one is
+                // floored to the radius so it reads as a sliver rather than a
+                // slider knob.
+                width: Usage.fillWidth(meterRow.displayFraction, parent.width, parent.radius)
                 color: meterRow.barColor
             }
         }

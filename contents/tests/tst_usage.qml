@@ -65,4 +65,20 @@ TestCase {
         compare(Usage.durationParts(NaN), null);
         compare(Usage.durationParts(undefined), null);
     }
+
+    function test_fillWidth() {
+        // The reported bug: a meter at 0% drew a sliver because the
+        // minimum-visible floor was applied unconditionally.
+        compare(Usage.fillWidth(0, 400, 4), 0, "a zero share leaves the track empty");
+        compare(Usage.fillWidth(0.0001, 400, 4), 4, "a tiny non-zero share is floored to a sliver");
+        compare(Usage.fillWidth(0.43, 400, 4), 172, "a normal share is proportional");
+        compare(Usage.fillWidth(1, 400, 4), 400);
+        compare(Usage.fillWidth(1.5, 400, 4), 400, "clamped above");
+        compare(Usage.fillWidth(-0.2, 400, 4), 0, "clamped below");
+        compare(Usage.fillWidth(0.5, 0, 4), 0, "a zero-width track has nothing to fill");
+        compare(Usage.fillWidth(0.5, 3, 4), 3, "the floor never exceeds the track");
+        compare(Usage.fillWidth(0.5, 400), 200, "no floor given");
+        compare(Usage.fillWidth(NaN, 400, 4), 0, "a NaN share draws nothing");
+        compare(Usage.fillWidth(0.5, NaN, 4), 0, "a NaN width draws nothing");
+    }
 }

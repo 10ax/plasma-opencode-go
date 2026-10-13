@@ -66,3 +66,21 @@ function durationParts(ms) {
         minutes: totalMinutes % 60
     };
 }
+
+// Width in pixels of the filled part of a bar, from the share to show (0..1),
+// the track's width and the smallest sliver worth drawing.
+//
+// The floor is deliberately NOT applied to a zero share: a meter at 0% must
+// leave the track completely empty, or the sliver reads as "a little used".
+function fillWidth(share, trackWidth, minimumVisible) {
+    const width = Number(trackWidth);
+    if (!isFinite(width) || width <= 0) {
+        return 0;
+    }
+    const shown = Number(share);
+    if (!isFinite(shown) || shown <= 0) {
+        return 0;
+    }
+    const floor = Number(minimumVisible) > 0 ? Number(minimumVisible) : 0;
+    return Math.min(width, Math.max(floor, width * clamp(shown, 0, 1)));
+}
