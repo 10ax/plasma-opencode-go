@@ -47,18 +47,6 @@ TestCase {
         compare(Usage.parseIso("2026-11-01T00:00:00Z").toISOString(), "2026-11-01T00:00:00.000Z");
     }
 
-    function test_amount() {
-        // The API reports micro-cents; the popup prints whole currency units.
-        compare(Usage.amount(61222604).toFixed(2), "0.61", "the rolling meter's spend");
-        compare(Usage.amount(1200000000).toFixed(2), "12.00", "its allowance");
-        compare(Usage.amount(2688693078).toFixed(2), "26.89", "the monthly meter's spend");
-        compare(Usage.amount(0), 0);
-        compare(Usage.amount(-5), 0, "a negative amount reads as nothing");
-        compare(Usage.amount(NaN), 0);
-        compare(Usage.amount(null), 0);
-        compare(Usage.amount(undefined), 0);
-    }
-
     function test_durationParts() {
         const sixDays = Usage.durationParts(((6 * 24) + 11) * 3600000);
         compare(JSON.stringify(sixDays), JSON.stringify({ expired: false, days: 6, hours: 11, minutes: 0 }));

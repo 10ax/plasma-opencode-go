@@ -28,14 +28,6 @@ function percent(meter, percentMode) {
     return Math.round(displayFraction(meter, percentMode) * 100);
 }
 
-// The API reports allowances in micro-cents (its own field names say so), so
-// this turns them into whole currency units. Locale formatting stays in QML;
-// this is only the arithmetic, and a missing/zero/garbage value reads as 0.
-function amount(microCents) {
-    const value = Number(microCents);
-    return isFinite(value) && value > 0 ? value / 1e8 : 0;
-}
-
 // The meter with the highest used share, or null for an empty list. The tray
 // text and the tooltip both summarize "the worst meter".
 function worstMeter(meters) {

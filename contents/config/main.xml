@@ -34,13 +34,5 @@
       <label>Show the worst meter's percentage next to the tray icon.</label>
       <default>false</default>
     </entry>
-    <entry name="showAmounts" type="Bool">
-      <label>Show each meter's used and total allowance next to its reset time.</label>
-      <default>true</default>
-    </entry>
-    <entry name="layoutMode" type="String">
-      <label>How the popup uses any leftover height: "compact" or "centred".</label>
-      <default>centred</default>
-    </entry>
   </group>
 </kcfg>

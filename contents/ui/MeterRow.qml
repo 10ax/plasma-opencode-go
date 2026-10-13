@@ -17,7 +17,6 @@ ColumnLayout {
     required property real displayFraction // drives the bar width
     required property string percentText
     required property string resetText
-    required property string amountText    // "" hides the allowance line
     required property color barColor
     required property int smallPointSize
 
@@ -69,28 +68,14 @@ ColumnLayout {
         }
     }
 
-    RowLayout {
+    PlasmaComponents3.Label {
         Layout.fillWidth: true
         // Line the reset text up under the label, not under the bar, which is
         // what made it float before.
         Layout.leftMargin: meterRow.labelWidth + Kirigami.Units.largeSpacing
-        spacing: Kirigami.Units.smallSpacing
-
-        PlasmaComponents3.Label {
-            Layout.fillWidth: true
-            text: meterRow.resetText
-            font.pointSize: meterRow.smallPointSize
-            opacity: 0.6
-            elide: Text.ElideRight
-        }
-
-        // "2.69 / 60.00": the same information as the percentage above, in
-        // absolute terms, so it right-aligns under the percentage column.
-        PlasmaComponents3.Label {
-            visible: meterRow.amountText.length > 0
-            text: meterRow.amountText
-            font.pointSize: meterRow.smallPointSize
-            opacity: 0.6
-        }
+        text: meterRow.resetText
+        font.pointSize: meterRow.smallPointSize
+        opacity: 0.6
+        elide: Text.ElideRight
     }
 }

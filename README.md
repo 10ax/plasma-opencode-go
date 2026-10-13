@@ -7,19 +7,18 @@ tray icon to open the popup; it does not steal focus otherwise.
 ```
 Go                      Renews Nov 1                 [ Manage ]
 Rolling     [█░░░░░░░░░░░░░░░░░░░░░]                       3%
-            Resets in 0h 6m                     $0.64 / $12.00
+            Resets in 0h 6m
 Weekly      [█░░░░░░░░░░░░░░░░░░░░░]                       7%
-            Resets in 6d 11h                    $3.24 / $30.00
+            Resets in 6d 11h
 Monthly     [█████████░░░░░░░░░░░░░]                      43%
-            Resets in 19d 22h                  $26.89 / $60.00
+            Resets in 19d 22h
 ──────────────────────────────────────────────────────────────
 Updated 16:29                              Refreshing in 5s
 ```
 
 The bar sits on the label's line; the reset countdown is indented under the
-label, with the allowance it is counting down to on the right. The percentage and
-the bar show the share used by default and can be switched to the share remaining
-in the settings.
+label. The percentage and the bar show the share used by default and can be
+switched to the share remaining in the settings.
 
 ## How it works
 
@@ -98,8 +97,6 @@ has:
 | Show last update and next refresh | on | Hides the footer row and its separator |
 | Show | Percentage used | Or *Percentage remaining* — switches both the number and the bar |
 | Show the percentage next to the tray icon | off | e.g. `Monthly 43%` next to the tray icon |
-| Show the used and total allowance under each meter | on | The `$0.64 / $12.00` line; the figures come from the API's `usedMicroCents`/`limitMicroCents` and are formatted with the system locale |
-| Popup layout | Centred | How the popup spends height it does not need. The system tray gives its popup a fixed size, so there is always slack: *Centred* puts half above the data and half below (footer stays pinned at the bottom), *Compact* leaves it all at the bottom. In a panel/desktop slot, which sizes itself to the content, neither matters |
 
 The settings live in `~/.config/plasma-org.kde.plasma.desktop-appletsrc`, defined
 by `contents/config/main.xml` and edited through
@@ -113,8 +110,6 @@ then says so instead of showing an empty list.
   footer shows a live "Refreshing in Ns" countdown.
 - On a failed request the last good values stay on screen and the error is shown
   under the meters.
-- If the plan is set to cancel at the end of the period, the header reads
-  *Cancels Nov 1* instead of *Renews Nov 1* (`cancelAtPeriodEnd` from the API).
 - The access token expires roughly monthly. The widget does **not** refresh it;
   when the console returns 401 the popup asks you to run
   `opencode auth login`.
