@@ -158,9 +158,11 @@ PlasmoidItem {
     fullRepresentation: PlasmaExtras.Representation {
         Layout.minimumWidth: Kirigami.Units.gridUnit * 18
         Layout.preferredWidth: Kirigami.Units.gridUnit * 21
-        // The popup sizes itself from the content, so the explicit padding has
-        // to be added back here or the last row gets clipped.
+        // The popup should be exactly as tall as its content. minimumHeight stops
+        // a host from clipping the last row; preferredHeight lets one that honours
+        // it (panel or desktop widget) hug the content instead of leaving slack.
         Layout.minimumHeight: body.implicitHeight + topPadding + bottomPadding
+        Layout.preferredHeight: body.implicitHeight + topPadding + bottomPadding
         collapseMarginsHint: true
 
         // Guarantee an even inset on every edge instead of relying on the

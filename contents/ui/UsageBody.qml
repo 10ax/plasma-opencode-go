@@ -148,6 +148,16 @@ ColumnLayout {
         wrapMode: Text.WordWrap
     }
 
+    // The system tray gives its popup a fixed size, and Qt Quick's layouts
+    // pour the leftover height into the gaps *between* children: in a 432 px tall
+    // tray popup the 13 px gaps became 93 px ones. This spacer takes all of the
+    // slack instead, so the rows keep their real spacing and the footer stays at
+    // the bottom. It collapses to zero when the host is already content-sized
+    // (panel/desktop widget), costing one spacing unit of bottom padding.
+    Item {
+        Layout.fillHeight: true
+    }
+
     Kirigami.Separator {
         Layout.fillWidth: true
         Layout.topMargin: Kirigami.Units.smallSpacing
