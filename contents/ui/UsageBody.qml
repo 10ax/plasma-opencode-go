@@ -19,8 +19,11 @@ ColumnLayout {
     required property string percentMode // "used" (default) or "remaining"
     required property bool hasData
     required property string renewsAt
+    required property bool cancelsAtPeriodEnd
     required property string errorText
     required property bool showFooter
+    required property bool showAmounts
+    required property string layoutMode  // "compact" | "centred"
     required property double nowMs
     required property int smallPointSize // point size for the secondary lines
     required property string refreshText // e.g. "Refreshing in 12s"
@@ -28,10 +31,21 @@ ColumnLayout {
 
     property string iconName: "opencode-go"
 
+    // The console bills in USD — the API's own field names end in "MicroCents".
+    // Flip this if that ever stops being true.
+    readonly property string currencySymbol: "$"
+
     spacing: Kirigami.Units.largeSpacing
 
     readonly property bool hasVisibleMeters: body.meters.length > 0
     readonly property bool footerVisible: body.hasData && body.showFooter
+
+    // The system tray gives its popup a fixed height, so the widget always has
+    // slack to get rid of. Where it goes is the user's choice:
+    //   compact - all of it below the content, above the pinned footer
+    //   centred - split above the header and below the content, so the data
+    //             block sits in the middle and the footer stays pinned
+    readonly property bool centredSlack: body.layoutMode === "centred"
 
     // Green/amber/red ramp driven by the theme, so the bar follows the user's
     // colour scheme instead of a hardcoded green. Always keyed on the share
@@ -66,7 +80,29 @@ ColumnLayout {
 
     function renewsText() {
         const date = Usage.parseIso(body.renewsAt);
-        return date ? i18n("Renews %1", Qt.formatDate(date, "MMM d")) : "";
+        if (!date) {
+            return "";
+        }
+        const when = Qt.formatDate(date, "MMM d");
+        return body.cancelsAtPeriodEnd ? i18n("Cancels %1", when) : i18n("Renews %1", when);
+    }
+
+    // "2.69 / 60.00" for a meter, or "" when the amounts are switched off or the
+    // API reported no allowance. Locale-aware decimal separator.
+    function amountText(meter) {
+        if (!body.showAmounts || !meter || !(meter.limit > 0)) {
+            return "";
+        }
+        const money = (value) => body.currencySymbol + Qt.locale().toString(Usage.amount(value), "f", 2);
+        return i18n("%1 / %2", money(meter.used), money(meter.limit));
+    }
+
+    // In "centred" mode this takes half of the slack, so the header-to-last-row
+    // block ends up in the middle of the popup; the bottom spacer takes the other
+    // half. Invisible means "ignored by the layout" here.
+    Item {
+        Layout.fillHeight: true
+        visible: body.centredSlack
     }
 
     RowLayout {
@@ -116,6 +152,7 @@ ColumnLayout {
                 displayFraction: Usage.displayFraction(modelData, body.percentMode)
                 percentText: Usage.percent(modelData, body.percentMode) + "%"
                 resetText: body.resetText(modelData.resetsAt)
+                amountText: body.amountText(modelData)
                 barColor: body.barColor(Usage.usedFraction(modelData))
             }
         }
@@ -148,12 +185,10 @@ ColumnLayout {
         wrapMode: Text.WordWrap
     }
 
-    // The system tray gives its popup a fixed size, and Qt Quick's layouts
-    // pour the leftover height into the gaps *between* children: in a 432 px tall
-    // tray popup the 13 px gaps became 93 px ones. This spacer takes all of the
-    // slack instead, so the rows keep their real spacing and the footer stays at
-    // the bottom. It collapses to zero when the host is already content-sized
-    // (panel/desktop widget), costing one spacing unit of bottom padding.
+    // The slack the tray's fixed-height popup leaves over. In "compact" this is
+    // the only thing taking it, so it collects below the meter list and the
+    // footer stays pinned at the bottom; in "centred" it shares the slack with
+    // the spacer above the header.
     Item {
         Layout.fillHeight: true
     }

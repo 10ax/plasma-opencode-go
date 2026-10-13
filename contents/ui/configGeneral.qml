@@ -24,9 +24,11 @@ KCM.SimpleKCM {
     property alias cfg_showMonthly: monthlyCheck.checked
     property alias cfg_showFooter: footerCheck.checked
     property alias cfg_showTrayText: trayTextCheck.checked
+    property alias cfg_showAmounts: amountsCheck.checked
 
     // Not an alias: ComboBox maps its current index to a string value.
     property string cfg_percentMode
+    property string cfg_layoutMode
 
     Kirigami.FormLayout {
         QQC2.SpinBox {
@@ -89,6 +91,28 @@ KCM.SimpleKCM {
         QQC2.CheckBox {
             id: trayTextCheck
             text: i18n("Show the percentage next to the tray icon")
+        }
+
+        QQC2.ComboBox {
+            id: layoutCombo
+
+            Kirigami.FormData.label: i18n("Popup layout:")
+
+            textRole: "text"
+            model: [
+                { value: "centred", text: i18n("Centred — put the spare space above and below the data") },
+                { value: "compact", text: i18n("Compact — keep the rows tight, spare space at the bottom") }
+            ]
+            currentIndex: {
+                const index = model.findIndex((entry) => entry.value === page.cfg_layoutMode);
+                return index >= 0 ? index : 0;
+            }
+            onActivated: page.cfg_layoutMode = model[currentIndex].value
+        }
+
+        QQC2.CheckBox {
+            id: amountsCheck
+            text: i18n("Show the used and total allowance under each meter")
         }
     }
 }

@@ -26,6 +26,7 @@ PlasmoidItem {
     // stay put on purpose and errorText explains what went wrong.
     property var meters: []
     property string renewsAt: ""
+    property bool cancelsAtPeriodEnd: false
     property bool hasData: false
     property string errorText: ""
 
@@ -99,6 +100,9 @@ PlasmoidItem {
     // size as the default font on several themes, which leaves the sub-lines
     // without any visual hierarchy.
     readonly property int smallPointSize: Math.max(6, Kirigami.Theme.defaultFont.pointSize - 1)
+
+    // The popup layouts UsageBody understands; see its layoutMode property.
+    readonly property var knownLayoutModes: ["compact", "centred"]
 
     Plasmoid.icon: "opencode-go"
     Plasmoid.status: PlasmaCore.Types.ActiveStatus
@@ -179,8 +183,14 @@ PlasmoidItem {
             percentMode: Plasmoid.configuration.percentMode
             hasData: root.hasData
             renewsAt: root.renewsAt
+            cancelsAtPeriodEnd: root.cancelsAtPeriodEnd
             errorText: root.errorText
             showFooter: Plasmoid.configuration.showFooter
+            showAmounts: Plasmoid.configuration.showAmounts
+            // The config file is user-editable, so only the three known modes get
+            // through; anything else behaves as "compact".
+            layoutMode: root.knownLayoutModes.includes(Plasmoid.configuration.layoutMode)
+                ? Plasmoid.configuration.layoutMode : "compact"
             nowMs: root.nowMs
             smallPointSize: root.smallPointSize
             refreshText: root.refreshCountdownText
@@ -228,6 +238,7 @@ PlasmoidItem {
             if (payload.ok) {
                 root.meters = payload.meters || [];
                 root.renewsAt = payload.renewsAt || "";
+                root.cancelsAtPeriodEnd = payload.cancelAtPeriodEnd === true;
                 root.hasData = root.meters.length > 0;
                 root.errorText = "";
                 return;
